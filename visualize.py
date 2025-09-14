@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -83,5 +84,122 @@ plt.tight_layout()
 plt.savefig("Samples/country_revenue.png")
 plt.show()
 
+=======
+# visualize.py
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
+
+# Ensure plots look clean
+sns.set(style="whitegrid")
+
+# Step 1: Load the scraped data
+df = pd.read_csv("Samples/Companies.csv")
+print("✅ Data Loaded")
+print(df.head())
+
+# Convert numeric columns properly (remove commas, convert to float/int)
+df["Revenue (Billions USD)"] = df["Revenue (Billions USD)"].astype(float)
+df["Employees"] = df["Employees"].str.replace(",", "").astype(int)
+df["Market Cap (B)"] = df["Market Cap (B)"].astype(float)
+
+# Step 2: Visualize raw data -> Top 10 companies by Revenue
+plt.figure(figsize=(10,6))
+sns.barplot(x="Company Name", y="Revenue (Billions USD)", data=df.head(10))
+plt.xticks(rotation=45)
+plt.title("Top 10 Companies by Revenue")
+
+# Save bar chart
+plt.savefig("Samples/top10_revenue.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# Step 3: Prepare data for ML (treat revenue like a sequence)
+data = df["Revenue (Billions USD)"].values.reshape(-1, 1)
+scaler = MinMaxScaler(feature_range=(0,1))
+scaled_data = scaler.fit_transform(data)
+
+# Function to create sequences for LSTM
+def create_sequences(data, seq_length=3):
+    X, y = [], []
+    for i in range(len(data) - seq_length):
+        X.append(data[i:i+seq_length])
+        y.append(data[i+seq_length])
+    return np.array(X), np.array(y)
+
+X, y = create_sequences(scaled_data, seq_length=3)
+
+# Step 4: Build LSTM model
+model = Sequential([
+    LSTM(50, activation="relu", input_shape=(X.shape[1], X.shape[2])),
+    Dense(1)
+])
+
+model.compile(optimizer="adam", loss="mse")
+model.fit(X, y, epochs=50, verbose=1)
+
+# Step 5: Make predictions
+predictions = model.predict(X)
+predicted_revenue = scaler.inverse_transform(predictions)
+
+# Step 6: Visualize predicted vs actual revenue
+plt.figure(figsize=(10,6))
+sns.lineplot(x=range(len(df)), y=df["Revenue (Billions USD)"], label="Actual Revenue")
+sns.lineplot(x=range(3, len(predicted_revenue)+3), y=predicted_revenue.flatten(), label="Predicted Revenue")
+plt.title("Actual vs Predicted Revenue (LSTM)")
+plt.xlabel("Company Index")
+plt.ylabel("Revenue (Billions USD)")
+plt.legend()
+
+# Save LSTM chart
+plt.savefig("Samples/revenue_predictions.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# Step 7: Forecast future revenue for upcoming years
+def forecast_future(model, data, seq_length=3, future_steps=5):
+    """
+    model: trained LSTM model
+    data: scaled revenue data
+    seq_length: how many past values used to predict next
+    future_steps: how many future years to predict
+    """
+    predictions = []
+    current_seq = data[-seq_length:]  # last known sequence
+    
+    for _ in range(future_steps):
+        pred = model.predict(current_seq.reshape(1, seq_length, 1))
+        predictions.append(pred[0, 0])
+        # update sequence by appending new prediction and removing first element
+        current_seq = np.append(current_seq[1:], pred).reshape(seq_length, 1)
+    
+    return scaler.inverse_transform(np.array(predictions).reshape(-1, 1))
+
+# Predict next 5 years of revenue
+future_years = 5
+future_revenue = forecast_future(model, scaled_data, seq_length=3, future_steps=future_years)
+
+# Step 8: Visualize future predictions
+plt.figure(figsize=(10,6))
+# Plot actual revenue
+sns.lineplot(x=range(len(df)), y=df["Revenue (Billions USD)"], label="Actual Revenue")
+# Plot model predictions on training data
+sns.lineplot(x=range(3, len(predicted_revenue)+3), y=predicted_revenue.flatten(), label="Predicted (Training)")
+# Plot future forecast
+sns.lineplot(x=range(len(df), len(df)+future_years), y=future_revenue.flatten(), label="Future Forecast", linestyle="--", marker="o")
+
+plt.title("Revenue Forecast for Upcoming Years (LSTM)")
+plt.xlabel("Company Index / Year progression")
+plt.ylabel("Revenue (Billions USD)")
+plt.legend()
+
+# Save forecast chart
+plt.savefig("Samples/future_revenue_forecast.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+print("📈 Future revenue forecast saved at: Samples/future_revenue_forecast.png")
+>>>>>>> Stashed changes
 
 
